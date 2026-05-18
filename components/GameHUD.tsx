@@ -12,7 +12,10 @@ export function GameHUD({ score, bestScore, nextColorId }: GameHUDProps) {
   return (
     <header className="game-hud" aria-label="Game status">
       <div className="title-row">
-        <h1 className="game-title">Bubble Dragon</h1>
+        <h1 className="game-title" aria-label="Bubble Dragon">
+          <span className="game-title__bubble">Bubble</span>
+          <span className="game-title__dragon">Dragon</span>
+        </h1>
       </div>
       <div className="stats-row">
         <div className="stat-card">
