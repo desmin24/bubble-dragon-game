@@ -15,9 +15,9 @@ import {
   LAUNCHER_Y,
   STORAGE_BEST_SCORE_KEY,
 } from "@/lib/game/constants";
-import { addBubbleToGrid, createInitialGrid, findFloatingBubbles, findMatchingCluster } from "@/lib/game/grid";
+import { addBubbleToGrid, createInitialGrid } from "@/lib/game/grid";
 import { buildAimPath, createShot, getAimTarget, hasHitBubble, updateMovingBubble } from "@/lib/game/physics";
-import { getShotScore } from "@/lib/game/scoring";
+import { resolveSettledShot } from "@/lib/game/rules";
 import type { AimState, GridBubble, MovingBubble } from "@/lib/game/types";
 
 type GameState = {
@@ -138,22 +138,10 @@ export function GameCanvas() {
   const settleMovingBubble = (moving: MovingBubble) => {
     const state = stateRef.current;
     const settled = addBubbleToGrid(moving.x, moving.y, moving.colorId, state.grid);
-    let nextGrid = [...state.grid, settled];
-    const matching = findMatchingCluster(settled, nextGrid);
-    let dropped: GridBubble[] = [];
+    const resolution = resolveSettledShot(state.grid, settled);
+    const nextGrid = resolution.grid;
 
-    if (matching.length >= 3) {
-      const matchingIds = new Set(matching.map((bubble) => bubble.id));
-      nextGrid = nextGrid.filter((bubble) => !matchingIds.has(bubble.id));
-      dropped = findFloatingBubbles(nextGrid);
-
-      if (dropped.length > 0) {
-        const droppedIds = new Set(dropped.map((bubble) => bubble.id));
-        nextGrid = nextGrid.filter((bubble) => !droppedIds.has(bubble.id));
-      }
-
-      state.score += getShotScore(matching.length, dropped.length);
-    }
+    state.score += resolution.scoreDelta;
 
     state.grid = nextGrid;
     state.moving = null;
