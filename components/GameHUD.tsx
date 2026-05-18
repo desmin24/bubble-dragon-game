@@ -4,9 +4,16 @@ type GameHUDProps = {
   score: number;
   bestScore: number;
   nextColorId: string;
+  scoreFeedback: ScoreFeedback | null;
 };
 
-export function GameHUD({ score, bestScore, nextColorId }: GameHUDProps) {
+export type ScoreFeedback = {
+  id: number;
+  amount: number;
+  droppedCount: number;
+};
+
+export function GameHUD({ score, bestScore, nextColorId, scoreFeedback }: GameHUDProps) {
   const nextColor = COLOR_BY_ID[nextColorId];
 
   return (
@@ -18,9 +25,17 @@ export function GameHUD({ score, bestScore, nextColorId }: GameHUDProps) {
         </h1>
       </div>
       <div className="stats-row">
-        <div className="stat-card">
+        <div className="stat-card score-card">
           <span className="stat-card__label">Score</span>
-          <span className="stat-card__value">{score}</span>
+          <span key={scoreFeedback?.id ?? "score"} className="stat-card__value score-card__value">
+            {score}
+          </span>
+          {scoreFeedback ? (
+            <span key={`float-${scoreFeedback.id}`} className="score-float" aria-hidden="true">
+              +{scoreFeedback.amount}
+              {scoreFeedback.droppedCount > 0 ? <small>Drop Bonus</small> : null}
+            </span>
+          ) : null}
         </div>
         <div className="stat-card">
           <span className="stat-card__label">Best Score</span>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { GameHUD } from "./GameHUD";
+import { GameHUD, type ScoreFeedback } from "./GameHUD";
 import { GameOverlay } from "./GameOverlay";
 import {
   BUBBLE_COLORS,
@@ -30,6 +30,34 @@ type GameState = {
   gameOver: boolean;
 };
 
+type BubbleEffectKind = "match" | "drop";
+
+type BubbleEffect = {
+  id: string;
+  x: number;
+  y: number;
+  colorId: string;
+  kind: BubbleEffectKind;
+  startedAt: number;
+  delay: number;
+  duration: number;
+  drift: number;
+};
+
+type HitEffect = {
+  id: string;
+  x: number;
+  y: number;
+  colorId: string;
+  startedAt: number;
+  duration: number;
+};
+
+type BubbleDrawOptions = {
+  alpha?: number;
+  glow?: boolean;
+};
+
 const emptyAim: AimState = { active: false, x: LAUNCHER_X, y: LAUNCHER_Y - 140 };
 
 function randomColorId(): string {
@@ -51,12 +79,16 @@ function createNewGame(): GameState {
 export function GameCanvas() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const stateRef = useRef<GameState>(createNewGame());
+  const bubbleEffectsRef = useRef<BubbleEffect[]>([]);
+  const hitEffectsRef = useRef<HitEffect[]>([]);
   const animationRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number>(0);
+  const scoreFeedbackIdRef = useRef(0);
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(0);
   const [nextColorId, setNextColorId] = useState(stateRef.current.nextColorId);
   const [gameOver, setGameOver] = useState(false);
+  const [scoreFeedback, setScoreFeedback] = useState<ScoreFeedback | null>(null);
 
   const syncReactState = useCallback(() => {
     const state = stateRef.current;
@@ -76,6 +108,9 @@ export function GameCanvas() {
 
   const restart = useCallback(() => {
     stateRef.current = createNewGame();
+    bubbleEffectsRef.current = [];
+    hitEffectsRef.current = [];
+    setScoreFeedback(null);
     syncReactState();
   }, [syncReactState]);
 
@@ -106,7 +141,9 @@ export function GameCanvas() {
       lastFrameRef.current = timestamp;
 
       tick(deltaSeconds);
-      drawGame(context, stateRef.current);
+      bubbleEffectsRef.current = pruneBubbleEffects(bubbleEffectsRef.current, timestamp);
+      hitEffectsRef.current = pruneHitEffects(hitEffectsRef.current, timestamp);
+      drawGame(context, stateRef.current, bubbleEffectsRef.current, hitEffectsRef.current, timestamp);
 
       animationRef.current = requestAnimationFrame(render);
     };
@@ -140,8 +177,52 @@ export function GameCanvas() {
     const settled = addBubbleToGrid(moving.x, moving.y, moving.colorId, state.grid);
     const resolution = resolveSettledShot(state.grid, settled);
     const nextGrid = resolution.grid;
+    const now = performance.now();
+
+    hitEffectsRef.current.push({
+      id: `hit-${settled.id}-${now}`,
+      x: settled.x,
+      y: settled.y,
+      colorId: settled.colorId,
+      startedAt: now,
+      duration: 260,
+    });
+
+    bubbleEffectsRef.current.push(
+      ...resolution.matched.map((bubble, index) => ({
+        id: `match-${bubble.id}-${now}`,
+        x: bubble.x,
+        y: bubble.y,
+        colorId: bubble.colorId,
+        kind: "match" as const,
+        startedAt: now,
+        delay: (index % 4) * 18,
+        duration: 390,
+        drift: 0,
+      })),
+      ...resolution.dropped.map((bubble, index) => ({
+        id: `drop-${bubble.id}-${now}`,
+        x: bubble.x,
+        y: bubble.y,
+        colorId: bubble.colorId,
+        kind: "drop" as const,
+        startedAt: now,
+        delay: 110 + (index % 6) * 26,
+        duration: 780,
+        drift: ((index % 5) - 2) * 8,
+      })),
+    );
 
     state.score += resolution.scoreDelta;
+
+    if (resolution.scoreDelta > 0) {
+      scoreFeedbackIdRef.current += 1;
+      setScoreFeedback({
+        id: scoreFeedbackIdRef.current,
+        amount: resolution.scoreDelta,
+        droppedCount: resolution.dropped.length,
+      });
+    }
 
     state.grid = nextGrid;
     state.moving = null;
@@ -206,7 +287,7 @@ export function GameCanvas() {
 
   return (
     <section className="game-frame" aria-label="Bubble Dragon game">
-      <GameHUD score={score} bestScore={bestScore} nextColorId={nextColorId} />
+      <GameHUD score={score} bestScore={bestScore} nextColorId={nextColorId} scoreFeedback={scoreFeedback} />
       <div className="canvas-wrap">
         <canvas
           ref={canvasRef}
@@ -233,7 +314,13 @@ export function GameCanvas() {
   );
 }
 
-function drawGame(context: CanvasRenderingContext2D, state: GameState) {
+function drawGame(
+  context: CanvasRenderingContext2D,
+  state: GameState,
+  bubbleEffects: BubbleEffect[],
+  hitEffects: HitEffect[],
+  timestamp: number,
+) {
   context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   drawBackground(context);
   drawDangerLine(context);
@@ -247,6 +334,8 @@ function drawGame(context: CanvasRenderingContext2D, state: GameState) {
     drawBubble(context, state.moving.x, state.moving.y, state.moving.colorId);
   }
 
+  drawBubbleEffects(context, bubbleEffects, timestamp);
+  drawHitEffects(context, hitEffects, timestamp);
   drawLauncher(context, state.currentColorId);
 }
 
@@ -459,14 +548,122 @@ function drawLauncher(context: CanvasRenderingContext2D, colorId: string) {
   drawBubble(context, LAUNCHER_X, heldBubbleY, colorId, 1.1 * pulse);
 }
 
+function drawBubbleEffects(context: CanvasRenderingContext2D, effects: BubbleEffect[], timestamp: number) {
+  for (const effect of effects) {
+    const elapsed = timestamp - effect.startedAt - effect.delay;
+
+    if (elapsed < 0) {
+      drawBubble(context, effect.x, effect.y, effect.colorId, 1, { alpha: 0.96 });
+      continue;
+    }
+
+    const progress = clamp(elapsed / effect.duration, 0, 1);
+
+    if (effect.kind === "match") {
+      drawMatchedBubbleEffect(context, effect, progress);
+    } else {
+      drawDroppedBubbleEffect(context, effect, progress);
+    }
+  }
+}
+
+function drawMatchedBubbleEffect(context: CanvasRenderingContext2D, effect: BubbleEffect, progress: number) {
+  const popScale = 1 + Math.sin(progress * Math.PI) * 0.34 - progress * 0.1;
+  const alpha = 1 - easeOutCubic(progress);
+  const ringRadius = BUBBLE_RADIUS * (1.1 + progress * 1.65);
+
+  context.save();
+  context.globalAlpha = Math.max(0, alpha);
+  context.shadowColor = "rgba(255, 255, 255, 0.8)";
+  context.shadowBlur = 16;
+  drawBubble(context, effect.x, effect.y, effect.colorId, popScale, {
+    alpha: Math.max(0, 0.95 - progress * 0.8),
+    glow: true,
+  });
+  context.restore();
+
+  context.save();
+  context.globalAlpha = Math.max(0, 0.8 - progress * 0.8);
+  context.strokeStyle = "rgba(255, 255, 255, 0.86)";
+  context.lineWidth = 2;
+  context.shadowColor = "rgba(255, 209, 102, 0.7)";
+  context.shadowBlur = 12;
+  context.beginPath();
+  context.arc(effect.x, effect.y, ringRadius, 0, Math.PI * 2);
+  context.stroke();
+
+  context.fillStyle = "rgba(255, 255, 255, 0.9)";
+  for (let index = 0; index < 4; index += 1) {
+    const angle = progress * Math.PI * 1.4 + index * (Math.PI / 2);
+    const sparkleDistance = BUBBLE_RADIUS * (0.8 + progress * 1.5);
+    context.beginPath();
+    context.arc(
+      effect.x + Math.cos(angle) * sparkleDistance,
+      effect.y + Math.sin(angle) * sparkleDistance,
+      1.7 * (1 - progress),
+      0,
+      Math.PI * 2,
+    );
+    context.fill();
+  }
+  context.restore();
+}
+
+function drawDroppedBubbleEffect(context: CanvasRenderingContext2D, effect: BubbleEffect, progress: number) {
+  const eased = easeInCubic(progress);
+  const y = effect.y + eased * 170;
+  const x = effect.x + Math.sin(progress * Math.PI * 1.8) * effect.drift;
+  const alpha = Math.max(0, 1 - progress * 0.86);
+  const scale = Math.max(0.62, 1 - progress * 0.22);
+
+  context.save();
+  context.globalAlpha = Math.max(0, 0.32 - progress * 0.3);
+  context.strokeStyle = "rgba(173, 245, 255, 0.42)";
+  context.lineWidth = 2;
+  context.beginPath();
+  context.moveTo(effect.x, effect.y + BUBBLE_RADIUS * 0.45);
+  context.quadraticCurveTo(x + effect.drift * 0.4, (effect.y + y) / 2, x, y - BUBBLE_RADIUS);
+  context.stroke();
+  context.restore();
+
+  drawBubble(context, x, y, effect.colorId, scale, { alpha });
+}
+
+function drawHitEffects(context: CanvasRenderingContext2D, effects: HitEffect[], timestamp: number) {
+  for (const effect of effects) {
+    const progress = clamp((timestamp - effect.startedAt) / effect.duration, 0, 1);
+    const alpha = 1 - progress;
+    const color = COLOR_BY_ID[effect.colorId] ?? BUBBLE_COLORS[0];
+
+    context.save();
+    context.globalAlpha = alpha;
+    context.strokeStyle = color.rim;
+    context.lineWidth = 3 - progress;
+    context.shadowColor = color.fill;
+    context.shadowBlur = 16;
+    context.beginPath();
+    context.arc(effect.x, effect.y, BUBBLE_RADIUS * (1 + progress * 1.25), 0, Math.PI * 2);
+    context.stroke();
+
+    context.globalAlpha = alpha * 0.22;
+    context.fillStyle = color.rim;
+    context.beginPath();
+    context.arc(effect.x, effect.y, BUBBLE_RADIUS * (0.9 + progress * 0.35), 0, Math.PI * 2);
+    context.fill();
+    context.restore();
+  }
+}
+
 function drawBubble(
   context: CanvasRenderingContext2D,
   x: number,
   y: number,
   colorId: string,
   scale = 1,
+  options: BubbleDrawOptions = {},
 ) {
   const color = COLOR_BY_ID[colorId] ?? BUBBLE_COLORS[0];
+  const alpha = options.alpha ?? 1;
   const radius = BUBBLE_RADIUS * scale;
   const gradient = context.createRadialGradient(
     x - radius * 0.38,
@@ -484,8 +681,9 @@ function drawBubble(
   gradient.addColorStop(1, color.shadow);
 
   context.save();
+  context.globalAlpha = alpha;
   context.shadowColor = "rgba(0, 0, 0, 0.32)";
-  context.shadowBlur = 10;
+  context.shadowBlur = options.glow ? 18 : 10;
   context.shadowOffsetY = 5;
   context.beginPath();
   context.arc(x, y, radius, 0, Math.PI * 2);
@@ -497,19 +695,39 @@ function drawBubble(
   context.strokeStyle = "rgba(255, 255, 255, 0.58)";
   context.stroke();
 
-  context.globalAlpha = 0.8;
+  context.globalAlpha = alpha * 0.8;
   context.fillStyle = "#ffffff";
   context.beginPath();
   context.ellipse(x - radius * 0.36, y - radius * 0.47, radius * 0.24, radius * 0.13, -0.55, 0, Math.PI * 2);
   context.fill();
 
-  context.globalAlpha = 0.18;
+  context.globalAlpha = alpha * 0.18;
   context.strokeStyle = "#ffffff";
   context.lineWidth = 1.2;
   context.beginPath();
   context.arc(x, y, radius * 0.7, 1.12 * Math.PI, 1.88 * Math.PI);
   context.stroke();
   context.restore();
+}
+
+function pruneBubbleEffects(effects: BubbleEffect[], timestamp: number): BubbleEffect[] {
+  return effects.filter((effect) => timestamp <= effect.startedAt + effect.delay + effect.duration);
+}
+
+function pruneHitEffects(effects: HitEffect[], timestamp: number): HitEffect[] {
+  return effects.filter((effect) => timestamp <= effect.startedAt + effect.duration);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function easeOutCubic(value: number): number {
+  return 1 - Math.pow(1 - value, 3);
+}
+
+function easeInCubic(value: number): number {
+  return value * value * value;
 }
 
 function drawCrystalHills(context: CanvasRenderingContext2D) {
