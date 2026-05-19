@@ -199,6 +199,16 @@ export function GameCanvas() {
     soundRef.current = sound;
     setSoundEnabled(initialSoundEnabled);
 
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        sound.pauseForPageHidden();
+        return;
+      }
+
+      void sound.resumeForPageVisible();
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     if (Number.isFinite(storedBest)) {
       setBestScore(storedBest);
@@ -209,6 +219,7 @@ export function GameCanvas() {
         window.clearTimeout(stageNoticeTimerRef.current);
       }
 
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       sound.dispose();
       soundRef.current = null;
     };

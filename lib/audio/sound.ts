@@ -15,11 +15,13 @@ export class BubbleDragonSound {
   private musicTimer: number | null = null;
   private enabled = true;
   private unlocked = false;
+  private shouldResumeMusicAfterVisible = false;
 
   setEnabled(enabled: boolean) {
     this.enabled = enabled;
 
     if (!enabled) {
+      this.shouldResumeMusicAfterVisible = false;
       this.stopMusic();
       return;
     }
@@ -41,10 +43,46 @@ export class BubbleDragonSound {
     }
 
     if (context.state === "suspended") {
-      await context.resume();
+      try {
+        await context.resume();
+      } catch {
+        return;
+      }
     }
 
     this.unlocked = true;
+    this.startMusic();
+  }
+
+  pauseForPageHidden() {
+    this.shouldResumeMusicAfterVisible = this.enabled && this.unlocked && this.musicOscillators.length > 0;
+    this.stopMusic();
+
+    if (this.context?.state === "running") {
+      void this.context.suspend();
+    }
+  }
+
+  async resumeForPageVisible() {
+    if (!this.enabled || !this.shouldResumeMusicAfterVisible) {
+      return;
+    }
+
+    const context = this.getContext();
+
+    if (!context) {
+      return;
+    }
+
+    if (context.state === "suspended") {
+      try {
+        await context.resume();
+      } catch {
+        return;
+      }
+    }
+
+    this.shouldResumeMusicAfterVisible = false;
     this.startMusic();
   }
 
