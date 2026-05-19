@@ -701,13 +701,21 @@ button {
 }
 
 @media (max-width: 719px) {
+  .app-shell {
+    min-height: 100svh;
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding: 6px 6px 8px;
+  }
+
   .game-frame {
-    gap: 8px;
-    padding: 10px;
+    width: min(378px, calc(100vw - 12px));
+    gap: 7px;
+    padding: 8px;
   }
 
   .game-hud {
-    gap: 6px;
+    gap: 5px;
   }
 
   .title-row {
@@ -715,82 +723,144 @@ button {
   }
 
   .game-title {
-    font-size: clamp(1.68rem, 7.35vw, 2.34rem);
+    font-size: clamp(1.5rem, 6.7vw, 2.08rem);
     line-height: 0.86;
   }
 
   .stage-badge {
-    min-width: 70px;
-    max-width: 84px;
-    padding: 5px 6px 6px;
+    min-width: 66px;
+    max-width: 80px;
+    padding: 4px 6px 5px;
   }
 
   .stage-badge span,
   .stage-badge small {
-    font-size: 0.46rem;
+    font-size: 0.43rem;
   }
 
   .stage-badge strong {
     margin-top: 2px;
-    font-size: 0.62rem;
+    font-size: 0.58rem;
   }
 
   .stage-badge small {
     margin-top: 2px;
-    font-size: 0.4rem;
+    font-size: 0.38rem;
   }
 
   .hero-gif-row {
-    min-height: 68px;
-    margin: -7px 0 -6px;
+    min-height: 48px;
+    margin: -9px 0 -8px;
   }
 
   .hero-gif-row::before {
-    width: 92px;
-    height: 48px;
+    width: 78px;
+    height: 36px;
     filter: blur(3px);
   }
 
   .hero-gif-row__dragon {
-    width: 96px;
+    width: 78px;
   }
 
   .hero-gif-row__pop {
-    right: max(72px, 26%);
-    top: 8px;
-    width: 32px;
+    right: max(82px, 28%);
+    top: 7px;
+    width: 24px;
   }
 
   .stats-row {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 78px;
-    gap: 6px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 72px;
+    gap: 5px;
   }
 
   .stat-card,
   .next-bubble {
-    padding: 7px 8px 8px;
-    border-radius: 16px;
+    padding: 5px 7px 6px;
+    border-radius: 15px;
   }
 
   .next-bubble__label,
   .stat-card__label {
-    font-size: 0.5rem;
-    letter-spacing: 0.055em;
+    font-size: 0.45rem;
+    letter-spacing: 0.045em;
   }
 
   .stat-card__value {
     margin-top: 1px;
-    font-size: 1.22rem;
+    font-size: 1.08rem;
   }
 
   .next-bubble__orb {
-    width: 24px;
-    height: 24px;
-    margin-top: 3px;
+    width: 21px;
+    height: 21px;
+    margin-top: 2px;
   }
 
   .canvas-wrap {
-    min-height: 330px;
+    height: clamp(330px, calc(100svh - 232px), 520px);
+    min-height: 0;
+    max-height: calc(100svh - 188px);
+    aspect-ratio: auto;
+    border-radius: 22px;
+  }
+
+  .footer-actions {
+    grid-template-columns: minmax(0, 1fr) 74px;
+    gap: 7px;
+  }
+
+  .restart-button {
+    padding: 10px 18px 11px;
+    font-size: 0.96rem;
+  }
+
+  .sound-toggle {
+    height: 39px;
+    gap: 5px;
+    font-size: 0.66rem;
+  }
+
+  .hint-text {
+    font-size: 0.78rem;
+  }
+}
+
+@media (max-width: 719px) and (max-height: 700px) {
+  .app-shell {
+    padding-top: 4px;
+  }
+
+  .game-frame {
+    gap: 6px;
+    padding: 7px;
+  }
+
+  .game-title {
+    font-size: clamp(1.36rem, 6.2vw, 1.82rem);
+  }
+
+  .hero-gif-row {
+    min-height: 36px;
+    margin: -12px 0 -10px;
+  }
+
+  .hero-gif-row__dragon {
+    width: 64px;
+  }
+
+  .hero-gif-row__pop {
+    width: 20px;
+    top: 5px;
+  }
+
+  .canvas-wrap {
+    height: clamp(300px, calc(100svh - 210px), 430px);
+    max-height: calc(100svh - 170px);
+  }
+
+  .game-footer {
+    gap: 4px;
   }
 }
 
