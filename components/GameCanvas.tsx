@@ -72,7 +72,23 @@ type BubbleDrawOptions = {
   glow?: boolean;
 };
 
+type LauncherDirection = "left" | "center" | "right";
+
 const emptyAim: AimState = { active: false, x: LAUNCHER_X, y: LAUNCHER_Y - 140 };
+const LAUNCHER_CHARACTER_X = CANVAS_WIDTH / 2;
+const LAUNCHER_CHARACTER_Y = CANVAS_HEIGHT - 55;
+const LAUNCHER_ROTATION_LIMIT = 22 * (Math.PI / 180);
+const LAUNCHER_DIRECTION_THRESHOLD = 7 * (Math.PI / 180);
+const LAUNCHER_IMAGE_SOURCES: Record<LauncherDirection, string> = {
+  left: "/images/characters/dragon-left-shooter.png",
+  center: "/images/characters/dragon-back-shooter.png",
+  right: "/images/characters/dragon-right-shooter.png",
+};
+const LAUNCHER_MUZZLE_OFFSETS: Record<LauncherDirection, { x: number; y: number }> = {
+  left: { x: -16, y: -42 },
+  center: { x: 34, y: -42 },
+  right: { x: 42, y: -42 },
+};
 
 function randomColorId(colorIds: string[]): string {
   const safeColorIds = colorIds.length > 0 ? colorIds : BUBBLE_COLORS.map((color) => color.id);
@@ -103,10 +119,12 @@ export function GameCanvas() {
   const stateRef = useRef<GameState>(createNewGame());
   const bubbleEffectsRef = useRef<BubbleEffect[]>([]);
   const hitEffectsRef = useRef<HitEffect[]>([]);
+  const launcherImagesRef = useRef<Partial<Record<LauncherDirection, HTMLImageElement>>>({});
   const soundRef = useRef<BubbleDragonSound | null>(null);
   const animationRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number>(0);
   const pressurePulseRef = useRef<number>(0);
+  const targetLauncherRotationRef = useRef(0);
   const scoreFeedbackIdRef = useRef(0);
   const stageNoticeIdRef = useRef(0);
   const stageNoticeTimerRef = useRef<number | null>(null);
@@ -150,6 +168,7 @@ export function GameCanvas() {
     bubbleEffectsRef.current = [];
     hitEffectsRef.current = [];
     pressurePulseRef.current = 0;
+    targetLauncherRotationRef.current = 0;
     setScoreFeedback(null);
     setStageNotice(null);
     syncReactState();
@@ -180,6 +199,7 @@ export function GameCanvas() {
     soundRef.current = sound;
     setSoundEnabled(initialSoundEnabled);
 
+
     if (Number.isFinite(storedBest)) {
       setBestScore(storedBest);
     }
@@ -191,6 +211,22 @@ export function GameCanvas() {
 
       sound.dispose();
       soundRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const launcherImages: Partial<Record<LauncherDirection, HTMLImageElement>> = {};
+
+    for (const [direction, src] of Object.entries(LAUNCHER_IMAGE_SOURCES) as Array<[LauncherDirection, string]>) {
+      const launcherImage = new Image();
+      launcherImage.src = src;
+      launcherImages[direction] = launcherImage;
+    }
+
+    launcherImagesRef.current = launcherImages;
+
+    return () => {
+      launcherImagesRef.current = {};
     };
   }, []);
 
@@ -213,6 +249,9 @@ export function GameCanvas() {
       lastFrameRef.current = timestamp;
 
       tick(deltaSeconds);
+      if (!stateRef.current.aim.active && !stateRef.current.moving) {
+        targetLauncherRotationRef.current = 0;
+      }
       bubbleEffectsRef.current = pruneBubbleEffects(bubbleEffectsRef.current, timestamp);
       hitEffectsRef.current = pruneHitEffects(hitEffectsRef.current, timestamp);
       drawGame(
@@ -222,6 +261,8 @@ export function GameCanvas() {
         hitEffectsRef.current,
         timestamp,
         pressurePulseRef.current,
+        launcherImagesRef.current,
+        targetLauncherRotationRef.current,
       );
 
       animationRef.current = requestAnimationFrame(render);
@@ -401,7 +442,11 @@ export function GameCanvas() {
     unlockAudio();
     event.currentTarget.setPointerCapture(event.pointerId);
     const pointer = getPointerPosition(event);
-    const target = getAimTarget(pointer.x, pointer.y);
+    const launcherRotation = getLauncherRotationForPointer(pointer.x, pointer.y);
+    const launcherDirection = getLauncherDirection(launcherRotation);
+    const muzzle = getLauncherMuzzle(launcherDirection);
+    targetLauncherRotationRef.current = launcherRotation;
+    const target = getAimTarget(pointer.x, pointer.y, muzzle);
     state.aim = { active: true, x: target.x, y: target.y };
   };
 
@@ -413,7 +458,11 @@ export function GameCanvas() {
     }
 
     const pointer = getPointerPosition(event);
-    const target = getAimTarget(pointer.x, pointer.y);
+    const launcherRotation = getLauncherRotationForPointer(pointer.x, pointer.y);
+    const launcherDirection = getLauncherDirection(launcherRotation);
+    const muzzle = getLauncherMuzzle(launcherDirection);
+    targetLauncherRotationRef.current = launcherRotation;
+    const target = getAimTarget(pointer.x, pointer.y, muzzle);
     state.aim = { active: true, x: target.x, y: target.y };
   };
 
@@ -425,11 +474,16 @@ export function GameCanvas() {
     }
 
     const pointer = getPointerPosition(event);
-    const target = getAimTarget(pointer.x, pointer.y);
+    const launcherRotation = getLauncherRotationForPointer(pointer.x, pointer.y);
+    const launcherDirection = getLauncherDirection(launcherRotation);
+    const muzzle = getLauncherMuzzle(launcherDirection);
+    targetLauncherRotationRef.current = launcherRotation;
+    const target = getAimTarget(pointer.x, pointer.y, muzzle);
     unlockAudio();
     playSound("shoot");
-    state.moving = createShot(target.x, target.y, state.currentColorId);
+    state.moving = createShot(target.x, target.y, state.currentColorId, muzzle);
     state.aim = emptyAim;
+    targetLauncherRotationRef.current = 0;
   };
 
   return (
@@ -453,6 +507,7 @@ export function GameCanvas() {
           onPointerUp={handlePointerUp}
           onPointerCancel={() => {
             stateRef.current.aim = emptyAim;
+            targetLauncherRotationRef.current = 0;
           }}
         />
       </div>
@@ -492,6 +547,8 @@ function drawGame(
   hitEffects: HitEffect[],
   timestamp: number,
   pressurePulseStartedAt: number,
+  launcherImages: Partial<Record<LauncherDirection, HTMLImageElement>>,
+  launcherRotation: number,
 ) {
   context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   drawBackground(context);
@@ -501,7 +558,10 @@ function drawGame(
 
   drawDangerLine(context, pressurePulseStrength);
   drawPressureWarning(context, pressurePulseStrength);
-  drawAim(context, state);
+  const launcherDirection = getLauncherDirection(launcherRotation);
+  const muzzle = getLauncherMuzzle(launcherDirection);
+
+  drawAim(context, state, muzzle);
 
   for (const bubble of state.grid) {
     drawBubble(context, bubble.x, bubble.y, bubble.colorId);
@@ -513,7 +573,7 @@ function drawGame(
 
   drawBubbleEffects(context, bubbleEffects, timestamp);
   drawHitEffects(context, hitEffects, timestamp);
-  drawLauncher(context, state.currentColorId);
+  drawLauncher(context, state.currentColorId, launcherImages, launcherDirection, muzzle);
 }
 
 function drawBackground(context: CanvasRenderingContext2D) {
@@ -600,12 +660,12 @@ function drawPressureWarning(context: CanvasRenderingContext2D, pressurePulseStr
   context.restore();
 }
 
-function drawAim(context: CanvasRenderingContext2D, state: GameState) {
+function drawAim(context: CanvasRenderingContext2D, state: GameState, muzzle: { x: number; y: number }) {
   if (!state.aim.active || state.moving || state.gameOver) {
     return;
   }
 
-  const path = buildAimPath(state.aim.x, state.aim.y);
+  const path = buildAimPath(state.aim.x, state.aim.y, muzzle);
   context.save();
   context.shadowColor = "rgba(84, 226, 255, 0.7)";
   context.shadowBlur = 12;
@@ -632,113 +692,50 @@ function drawAim(context: CanvasRenderingContext2D, state: GameState) {
   context.restore();
 }
 
-function drawLauncher(context: CanvasRenderingContext2D, colorId: string) {
+function drawLauncher(
+  context: CanvasRenderingContext2D,
+  colorId: string,
+  launcherImages: Partial<Record<LauncherDirection, HTMLImageElement>>,
+  launcherDirection: LauncherDirection,
+  muzzle: { x: number; y: number },
+) {
   const pulse = 1 + Math.sin(performance.now() / 420) * 0.025;
-  const characterY = LAUNCHER_Y - 3;
-  const heldBubbleY = LAUNCHER_Y - 32;
+  const imageWidth = 124;
+  const imageHeight = 124;
+  const launcherImage = launcherImages[launcherDirection] ?? launcherImages.center;
 
   context.save();
   context.fillStyle = "rgba(0, 0, 0, 0.2)";
   context.filter = "blur(7px)";
   context.beginPath();
-  context.ellipse(LAUNCHER_X, characterY + 52, 72, 16, 0, 0, Math.PI * 2);
+  context.ellipse(LAUNCHER_CHARACTER_X, LAUNCHER_CHARACTER_Y + 24, 70, 15, 0, 0, Math.PI * 2);
   context.fill();
   context.restore();
 
-  context.save();
-  context.translate(LAUNCHER_X, characterY);
-
-  const bodyGradient = context.createLinearGradient(0, -26, 0, 42);
-  bodyGradient.addColorStop(0, "#8af3ff");
-  bodyGradient.addColorStop(0.45, "#4d82ff");
-  bodyGradient.addColorStop(1, "#2b1a83");
-
-  context.fillStyle = "rgba(113, 80, 255, 0.28)";
-  context.beginPath();
-  context.ellipse(0, 43, 66, 17, 0, 0, Math.PI * 2);
-  context.fill();
-
-  context.fillStyle = bodyGradient;
-  context.beginPath();
-  context.moveTo(0, -38);
-  context.quadraticCurveTo(48, -22, 43, 24);
-  context.quadraticCurveTo(18, 45, -18, 45);
-  context.quadraticCurveTo(-49, 25, -43, -18);
-  context.quadraticCurveTo(-24, -42, 0, -38);
-  context.fill();
-
-  const bellyGradient = context.createLinearGradient(0, 3, 0, 48);
-  bellyGradient.addColorStop(0, "#c8fbff");
-  bellyGradient.addColorStop(1, "#5ec8ff");
-  context.fillStyle = bellyGradient;
-  context.beginPath();
-  context.ellipse(0, 25, 20, 21, 0, 0, Math.PI * 2);
-  context.fill();
-
-  context.strokeStyle = "rgba(255, 255, 255, 0.4)";
-  context.lineWidth = 2;
-  context.beginPath();
-  context.arc(0, 24, 13, 0.2 * Math.PI, 0.8 * Math.PI);
-  context.stroke();
-
-  context.fillStyle = "#ffd166";
-  context.beginPath();
-  context.moveTo(-30, -16);
-  context.lineTo(-58, -29);
-  context.lineTo(-38, 2);
-  context.fill();
-  context.beginPath();
-  context.moveTo(30, -16);
-  context.lineTo(58, -29);
-  context.lineTo(38, 2);
-  context.fill();
-
-  context.fillStyle = "#fff0a7";
-  context.beginPath();
-  context.moveTo(-12, -36);
-  context.lineTo(-6, -56);
-  context.lineTo(0, -37);
-  context.fill();
-  context.beginPath();
-  context.moveTo(12, -36);
-  context.lineTo(6, -56);
-  context.lineTo(0, -37);
-  context.fill();
-
-  context.fillStyle = "#07102c";
-  context.beginPath();
-  context.arc(-13, -16, 4.5, 0, Math.PI * 2);
-  context.arc(13, -16, 4.5, 0, Math.PI * 2);
-  context.fill();
-
-  context.fillStyle = "rgba(255, 255, 255, 0.82)";
-  context.beginPath();
-  context.arc(-14.5, -17.5, 1.5, 0, Math.PI * 2);
-  context.arc(11.5, -17.5, 1.5, 0, Math.PI * 2);
-  context.fill();
-
-  context.fillStyle = "rgba(255, 138, 199, 0.58)";
-  context.beginPath();
-  context.arc(-24, -5, 5, 0, Math.PI * 2);
-  context.arc(24, -5, 5, 0, Math.PI * 2);
-  context.fill();
-
-  context.strokeStyle = "rgba(255,255,255,0.55)";
-  context.lineWidth = 3;
-  context.beginPath();
-  context.arc(0, -3, 15, 0.15 * Math.PI, 0.85 * Math.PI);
-  context.stroke();
-  context.restore();
+  if (launcherImage?.complete && launcherImage.naturalWidth > 0) {
+    context.save();
+    context.shadowColor = "rgba(3, 9, 30, 0.32)";
+    context.shadowBlur = 18;
+    context.shadowOffsetY = 8;
+    context.drawImage(
+      launcherImage,
+      LAUNCHER_CHARACTER_X - imageWidth / 2,
+      LAUNCHER_CHARACTER_Y - imageHeight + 20,
+      imageWidth,
+      imageHeight,
+    );
+    context.restore();
+  }
 
   context.save();
   context.strokeStyle = "rgba(84, 226, 255, 0.38)";
   context.lineWidth = 3;
   context.beginPath();
-  context.arc(LAUNCHER_X, heldBubbleY, BUBBLE_RADIUS * 1.38 * pulse, 0, Math.PI * 2);
+  context.arc(muzzle.x, muzzle.y, BUBBLE_RADIUS * 1.38 * pulse, 0, Math.PI * 2);
   context.stroke();
   context.restore();
 
-  drawBubble(context, LAUNCHER_X, heldBubbleY, colorId, 1.1 * pulse);
+  drawBubble(context, muzzle.x, muzzle.y, colorId, 1.1 * pulse);
 }
 
 function drawBubbleEffects(context: CanvasRenderingContext2D, effects: BubbleEffect[], timestamp: number) {
@@ -913,6 +910,35 @@ function pruneHitEffects(effects: HitEffect[], timestamp: number): HitEffect[] {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
+}
+
+function getLauncherRotationForPointer(pointerX: number, pointerY: number): number {
+  const dx = pointerX - LAUNCHER_CHARACTER_X;
+  const dy = Math.max(44, LAUNCHER_CHARACTER_Y - pointerY);
+  const aimLean = Math.atan2(dx, dy) * 0.55;
+
+  return clamp(aimLean, -LAUNCHER_ROTATION_LIMIT, LAUNCHER_ROTATION_LIMIT);
+}
+
+function getLauncherDirection(rotation: number): LauncherDirection {
+  if (rotation < -LAUNCHER_DIRECTION_THRESHOLD) {
+    return "left";
+  }
+
+  if (rotation > LAUNCHER_DIRECTION_THRESHOLD) {
+    return "right";
+  }
+
+  return "center";
+}
+
+function getLauncherMuzzle(direction: LauncherDirection): { x: number; y: number } {
+  const offset = LAUNCHER_MUZZLE_OFFSETS[direction];
+
+  return {
+    x: LAUNCHER_CHARACTER_X + offset.x,
+    y: LAUNCHER_CHARACTER_Y + offset.y,
+  };
 }
 
 function easeOutCubic(value: number): number {

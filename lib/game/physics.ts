@@ -9,14 +9,26 @@ import {
 } from "./constants";
 import type { GridBubble, MovingBubble } from "./types";
 
-export function createShot(targetX: number, targetY: number, colorId: string): MovingBubble {
-  const dx = targetX - LAUNCHER_X;
-  const dy = targetY - LAUNCHER_Y;
+type LaunchOrigin = {
+  x: number;
+  y: number;
+};
+
+const DEFAULT_LAUNCH_ORIGIN: LaunchOrigin = { x: LAUNCHER_X, y: LAUNCHER_Y };
+
+export function createShot(
+  targetX: number,
+  targetY: number,
+  colorId: string,
+  origin: LaunchOrigin = DEFAULT_LAUNCH_ORIGIN,
+): MovingBubble {
+  const dx = targetX - origin.x;
+  const dy = targetY - origin.y;
   const angle = clampShotAngle(Math.atan2(dy, dx));
 
   return {
-    x: LAUNCHER_X,
-    y: LAUNCHER_Y,
+    x: origin.x,
+    y: origin.y,
     vx: Math.cos(angle) * SHOT_SPEED,
     vy: Math.sin(angle) * SHOT_SPEED,
     colorId,
@@ -45,21 +57,29 @@ export function hasHitBubble(moving: MovingBubble, bubbles: GridBubble[]): boole
   return bubbles.some((bubble) => Math.hypot(bubble.x - moving.x, bubble.y - moving.y) <= HIT_DISTANCE);
 }
 
-export function getAimTarget(pointerX: number, pointerY: number): { x: number; y: number } {
-  const dy = Math.min(pointerY - LAUNCHER_Y, -20);
-  const dx = pointerX - LAUNCHER_X;
+export function getAimTarget(
+  pointerX: number,
+  pointerY: number,
+  origin: LaunchOrigin = DEFAULT_LAUNCH_ORIGIN,
+): { x: number; y: number } {
+  const dy = Math.min(pointerY - origin.y, -20);
+  const dx = pointerX - origin.x;
   const angle = clampShotAngle(Math.atan2(dy, dx));
   const distance = Math.max(80, Math.hypot(dx, dy));
 
   return {
-    x: LAUNCHER_X + Math.cos(angle) * distance,
-    y: LAUNCHER_Y + Math.sin(angle) * distance,
+    x: origin.x + Math.cos(angle) * distance,
+    y: origin.y + Math.sin(angle) * distance,
   };
 }
 
-export function buildAimPath(targetX: number, targetY: number): Array<{ x: number; y: number }> {
-  const shot = createShot(targetX, targetY, "preview");
-  const points = [{ x: LAUNCHER_X, y: LAUNCHER_Y }];
+export function buildAimPath(
+  targetX: number,
+  targetY: number,
+  origin: LaunchOrigin = DEFAULT_LAUNCH_ORIGIN,
+): Array<{ x: number; y: number }> {
+  const shot = createShot(targetX, targetY, "preview", origin);
+  const points = [{ x: origin.x, y: origin.y }];
   let x = shot.x;
   let y = shot.y;
   let vx = shot.vx;
