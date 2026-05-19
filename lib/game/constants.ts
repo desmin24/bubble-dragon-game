@@ -23,6 +23,7 @@ export const BUBBLE_COLORS: BubbleColor[] = [
   { id: "aqua", fill: "#4dd9ff", rim: "#c8f6ff", shadow: "#05759a" },
   { id: "leaf", fill: "#63e38d", rim: "#cfffdc", shadow: "#168046" },
   { id: "violet", fill: "#a78bfa", rim: "#dfd6ff", shadow: "#5530b7" },
+  { id: "tangerine", fill: "#ff9f1c", rim: "#ffe0a3", shadow: "#9a4f00" },
 ];
 
 export const COLOR_BY_ID = BUBBLE_COLORS.reduce<Record<string, BubbleColor>>(

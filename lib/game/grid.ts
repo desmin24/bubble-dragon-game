@@ -10,6 +10,7 @@ import type { Cell, GridBubble } from "./types";
 
 const ROW_GAP = Math.sqrt(3) * BUBBLE_RADIUS;
 const HORIZONTAL_GAP = BUBBLE_RADIUS * 2;
+const DEFAULT_COLOR_IDS = BUBBLE_COLORS.map((color) => color.id);
 
 export function getCellPosition(row: number, col: number): Cell {
   const rowOffset = row % 2 === 0 ? 0 : BUBBLE_RADIUS;
@@ -26,21 +27,24 @@ export function getRowLength(row: number): number {
   return row % 2 === 0 ? GRID_COLS : GRID_COLS - 1;
 }
 
-export function createInitialGrid(): GridBubble[] {
+export function createInitialGrid(colorIds: string[] = DEFAULT_COLOR_IDS): GridBubble[] {
   const bubbles: GridBubble[] = [];
+  const safeColorIds = colorIds.length > 0 ? colorIds : DEFAULT_COLOR_IDS;
+  const openingSeed = Math.floor(Math.random() * safeColorIds.length);
 
   for (let row = 0; row < INITIAL_ROWS; row += 1) {
     const rowLength = getRowLength(row);
 
     for (let col = 0; col < rowLength; col += 1) {
       const cell = getCellPosition(row, col);
-      const color = BUBBLE_COLORS[(row * 3 + col * 2 + Math.floor(Math.random() * 3)) % BUBBLE_COLORS.length];
+      const clusterIndex = openingSeed + Math.floor(row / 2) * 2 + Math.floor(col / 2);
+      const colorId = safeColorIds[clusterIndex % safeColorIds.length];
 
       bubbles.push({
         id: `${row}-${col}-${crypto.randomUUID()}`,
         row,
         col,
-        colorId: color.id,
+        colorId,
         x: cell.x,
         y: cell.y,
       });
@@ -129,6 +133,48 @@ export function addBubbleToGrid(
     x: cell.x,
     y: cell.y,
   };
+}
+
+export function advanceGridPressure(
+  bubbles: GridBubble[],
+  colorIds: string[] = DEFAULT_COLOR_IDS,
+  rowsToAdvance = 2,
+): GridBubble[] {
+  const safeColorIds = colorIds.length > 0 ? colorIds : DEFAULT_COLOR_IDS;
+  const seed = Math.floor(Math.random() * safeColorIds.length);
+  const pressureRows: GridBubble[] = [];
+
+  for (let row = 0; row < rowsToAdvance; row += 1) {
+    const rowLength = getRowLength(row);
+
+    for (let col = 0; col < rowLength; col += 1) {
+      const cell = getCellPosition(row, col);
+      const colorId = safeColorIds[(seed + row + Math.floor(col / 2)) % safeColorIds.length];
+
+      pressureRows.push({
+        id: `pressure-${row}-${col}-${crypto.randomUUID()}`,
+        row,
+        col,
+        colorId,
+        x: cell.x,
+        y: cell.y,
+      });
+    }
+  }
+
+  const shiftedBubbles = bubbles.map((bubble) => {
+    const nextRow = bubble.row + rowsToAdvance;
+    const cell = getCellPosition(nextRow, bubble.col);
+
+    return {
+      ...bubble,
+      row: nextRow,
+      x: cell.x,
+      y: cell.y,
+    };
+  });
+
+  return [...pressureRows, ...shiftedBubbles];
 }
 
 export function findMatchingCluster(start: GridBubble, bubbles: GridBubble[]): GridBubble[] {

@@ -15,7 +15,8 @@ import {
   LAUNCHER_Y,
   STORAGE_BEST_SCORE_KEY,
 } from "@/lib/game/constants";
-import { addBubbleToGrid, createInitialGrid } from "@/lib/game/grid";
+import { getColorIdsForTier, getDifficultyTier, PRESSURE_ADVANCE_ROWS, type DifficultyTier } from "@/lib/game/difficulty";
+import { addBubbleToGrid, advanceGridPressure, createInitialGrid } from "@/lib/game/grid";
 import { buildAimPath, createShot, getAimTarget, hasHitBubble, updateMovingBubble } from "@/lib/game/physics";
 import { resolveSettledShot } from "@/lib/game/rules";
 import { BubbleDragonSound, STORAGE_SOUND_ENABLED_KEY, type SoundCue } from "@/lib/audio/sound";
@@ -28,6 +29,9 @@ type GameState = {
   nextColorId: string;
   aim: AimState;
   score: number;
+  shotsFired: number;
+  missesSinceClear: number;
+  difficultyTier: DifficultyTier;
   gameOver: boolean;
 };
 
@@ -54,6 +58,15 @@ type HitEffect = {
   duration: number;
 };
 
+type StageNoticeKind = "tier" | "pressure";
+
+type StageNotice = {
+  id: number;
+  title: string;
+  detail: string;
+  kind: StageNoticeKind;
+};
+
 type BubbleDrawOptions = {
   alpha?: number;
   glow?: boolean;
@@ -61,18 +74,26 @@ type BubbleDrawOptions = {
 
 const emptyAim: AimState = { active: false, x: LAUNCHER_X, y: LAUNCHER_Y - 140 };
 
-function randomColorId(): string {
-  return BUBBLE_COLORS[Math.floor(Math.random() * BUBBLE_COLORS.length)].id;
+function randomColorId(colorIds: string[]): string {
+  const safeColorIds = colorIds.length > 0 ? colorIds : BUBBLE_COLORS.map((color) => color.id);
+
+  return safeColorIds[Math.floor(Math.random() * safeColorIds.length)];
 }
 
 function createNewGame(): GameState {
+  const difficultyTier = getDifficultyTier(0, 0);
+  const colorIds = getColorIdsForTier(difficultyTier);
+
   return {
-    grid: createInitialGrid(),
+    grid: createInitialGrid(colorIds),
     moving: null,
-    currentColorId: randomColorId(),
-    nextColorId: randomColorId(),
+    currentColorId: randomColorId(colorIds),
+    nextColorId: randomColorId(colorIds),
     aim: emptyAim,
     score: 0,
+    shotsFired: 0,
+    missesSinceClear: 0,
+    difficultyTier,
     gameOver: false,
   };
 }
@@ -85,12 +106,17 @@ export function GameCanvas() {
   const soundRef = useRef<BubbleDragonSound | null>(null);
   const animationRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number>(0);
+  const pressurePulseRef = useRef<number>(0);
   const scoreFeedbackIdRef = useRef(0);
+  const stageNoticeIdRef = useRef(0);
+  const stageNoticeTimerRef = useRef<number | null>(null);
   const [score, setScore] = useState(0);
   const [bestScore, setBestScore] = useState(0);
   const [nextColorId, setNextColorId] = useState(stateRef.current.nextColorId);
+  const [difficultyTier, setDifficultyTier] = useState(stateRef.current.difficultyTier);
   const [gameOver, setGameOver] = useState(false);
   const [scoreFeedback, setScoreFeedback] = useState<ScoreFeedback | null>(null);
+  const [stageNotice, setStageNotice] = useState<StageNotice | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(true);
 
   const playSound = useCallback((cue: SoundCue) => {
@@ -105,6 +131,7 @@ export function GameCanvas() {
     const state = stateRef.current;
     setScore(state.score);
     setNextColorId(state.nextColorId);
+    setDifficultyTier(state.difficultyTier);
     setGameOver(state.gameOver);
     setBestScore((currentBest) => {
       const nextBest = Math.max(currentBest, state.score);
@@ -122,9 +149,26 @@ export function GameCanvas() {
     stateRef.current = createNewGame();
     bubbleEffectsRef.current = [];
     hitEffectsRef.current = [];
+    pressurePulseRef.current = 0;
     setScoreFeedback(null);
+    setStageNotice(null);
     syncReactState();
   }, [syncReactState, unlockAudio]);
+
+  const showStageNotice = useCallback((title: string, detail: string, kind: StageNoticeKind) => {
+    stageNoticeIdRef.current += 1;
+    const id = stageNoticeIdRef.current;
+
+    if (stageNoticeTimerRef.current !== null) {
+      window.clearTimeout(stageNoticeTimerRef.current);
+    }
+
+    setStageNotice({ id, title, detail, kind });
+    stageNoticeTimerRef.current = window.setTimeout(() => {
+      setStageNotice((currentNotice) => (currentNotice?.id === id ? null : currentNotice));
+      stageNoticeTimerRef.current = null;
+    }, kind === "pressure" ? 1400 : 1900);
+  }, []);
 
   useEffect(() => {
     const sound = new BubbleDragonSound();
@@ -141,6 +185,10 @@ export function GameCanvas() {
     }
 
     return () => {
+      if (stageNoticeTimerRef.current !== null) {
+        window.clearTimeout(stageNoticeTimerRef.current);
+      }
+
       sound.dispose();
       soundRef.current = null;
     };
@@ -167,7 +215,14 @@ export function GameCanvas() {
       tick(deltaSeconds);
       bubbleEffectsRef.current = pruneBubbleEffects(bubbleEffectsRef.current, timestamp);
       hitEffectsRef.current = pruneHitEffects(hitEffectsRef.current, timestamp);
-      drawGame(context, stateRef.current, bubbleEffectsRef.current, hitEffectsRef.current, timestamp);
+      drawGame(
+        context,
+        stateRef.current,
+        bubbleEffectsRef.current,
+        hitEffectsRef.current,
+        timestamp,
+        pressurePulseRef.current,
+      );
 
       animationRef.current = requestAnimationFrame(render);
     };
@@ -205,8 +260,28 @@ export function GameCanvas() {
     const state = stateRef.current;
     const settled = addBubbleToGrid(moving.x, moving.y, moving.colorId, state.grid);
     const resolution = resolveSettledShot(state.grid, settled);
-    const nextGrid = resolution.grid;
     const now = performance.now();
+    const shotsFired = state.shotsFired + 1;
+    const score = state.score + resolution.scoreDelta;
+    const didClear = resolution.matched.length >= 3;
+    const nextTier = getDifficultyTier(score, shotsFired);
+    const activeColorIds = getColorIdsForTier(nextTier);
+    const didTierChange = nextTier.id !== state.difficultyTier.id;
+    let nextGrid = resolution.grid;
+    let missesSinceClear = didClear ? 0 : state.missesSinceClear + 1;
+    let didPressureAdvance = false;
+
+    if (
+      !didClear &&
+      nextTier.pressureEveryMisses !== null &&
+      missesSinceClear >= nextTier.pressureEveryMisses
+    ) {
+      nextGrid = advanceGridPressure(nextGrid, activeColorIds, PRESSURE_ADVANCE_ROWS);
+      missesSinceClear = 0;
+      didPressureAdvance = true;
+      pressurePulseRef.current = now;
+    }
+
     const didGameOver = nextGrid.some((bubble) => bubble.y + BUBBLE_RADIUS >= DANGER_LINE_Y);
 
     hitEffectsRef.current.push({
@@ -253,11 +328,11 @@ export function GameCanvas() {
       playSound("drop");
     }
 
-    if (didGameOver) {
-      playSound("gameOver");
+    if (didTierChange) {
+      showStageNotice(nextTier.noticeTitle, nextTier.noticeDetail, "tier");
+    } else if (didPressureAdvance) {
+      showStageNotice("Pressure Wave", "Rows moved down", "pressure");
     }
-
-    state.score += resolution.scoreDelta;
 
     if (resolution.scoreDelta > 0) {
       scoreFeedbackIdRef.current += 1;
@@ -268,10 +343,18 @@ export function GameCanvas() {
       });
     }
 
+    if (didGameOver) {
+      playSound("gameOver");
+    }
+
     state.grid = nextGrid;
     state.moving = null;
     state.currentColorId = state.nextColorId;
-    state.nextColorId = randomColorId();
+    state.nextColorId = randomColorId(activeColorIds);
+    state.score = score;
+    state.shotsFired = shotsFired;
+    state.missesSinceClear = missesSinceClear;
+    state.difficultyTier = nextTier;
     state.gameOver = didGameOver;
     syncReactState();
   };
@@ -351,7 +434,13 @@ export function GameCanvas() {
 
   return (
     <section className="game-frame" aria-label="Bubble Dragon game">
-      <GameHUD score={score} bestScore={bestScore} nextColorId={nextColorId} scoreFeedback={scoreFeedback} />
+      <GameHUD
+        score={score}
+        bestScore={bestScore}
+        nextColorId={nextColorId}
+        scoreFeedback={scoreFeedback}
+        difficultyTier={difficultyTier}
+      />
       <div className="canvas-wrap">
         <canvas
           ref={canvasRef}
@@ -367,6 +456,12 @@ export function GameCanvas() {
           }}
         />
       </div>
+      {stageNotice ? (
+        <div key={stageNotice.id} className={`stage-toast stage-toast--${stageNotice.kind}`} role="status">
+          <strong>{stageNotice.title}</strong>
+          <span>{stageNotice.detail}</span>
+        </div>
+      ) : null}
       <footer className="game-footer">
         <div className="footer-actions">
           <button className="restart-button" type="button" onClick={restart}>
@@ -396,10 +491,16 @@ function drawGame(
   bubbleEffects: BubbleEffect[],
   hitEffects: HitEffect[],
   timestamp: number,
+  pressurePulseStartedAt: number,
 ) {
   context.clearRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   drawBackground(context);
-  drawDangerLine(context);
+  const pressurePulseProgress =
+    pressurePulseStartedAt > 0 ? clamp((timestamp - pressurePulseStartedAt) / 700, 0, 1) : 1;
+  const pressurePulseStrength = pressurePulseStartedAt > 0 && pressurePulseProgress < 1 ? 1 - pressurePulseProgress : 0;
+
+  drawDangerLine(context, pressurePulseStrength);
+  drawPressureWarning(context, pressurePulseStrength);
   drawAim(context, state);
 
   for (const bubble of state.grid) {
@@ -459,13 +560,13 @@ function drawBackground(context: CanvasRenderingContext2D) {
   drawCrystalHills(context);
 }
 
-function drawDangerLine(context: CanvasRenderingContext2D) {
+function drawDangerLine(context: CanvasRenderingContext2D, pressurePulseStrength = 0) {
   context.save();
   context.setLineDash([9, 8]);
-  context.lineWidth = 2.2;
-  context.shadowColor = "rgba(255, 107, 154, 0.42)";
-  context.shadowBlur = 10;
-  context.strokeStyle = "rgba(255, 107, 154, 0.8)";
+  context.lineWidth = 2.2 + pressurePulseStrength * 1.2;
+  context.shadowColor = "rgba(255, 107, 154, 0.56)";
+  context.shadowBlur = 10 + pressurePulseStrength * 18;
+  context.strokeStyle = `rgba(255, 107, 154, ${0.8 + pressurePulseStrength * 0.18})`;
   context.beginPath();
   context.moveTo(21, DANGER_LINE_Y);
   context.lineTo(CANVAS_WIDTH - 21, DANGER_LINE_Y);
@@ -480,6 +581,22 @@ function drawDangerLine(context: CanvasRenderingContext2D) {
   context.font = "900 10px Trebuchet MS, sans-serif";
   context.letterSpacing = "0.7px";
   context.fillText("DANGER", 28, DANGER_LINE_Y - 7);
+  context.restore();
+}
+
+function drawPressureWarning(context: CanvasRenderingContext2D, pressurePulseStrength: number) {
+  if (pressurePulseStrength <= 0) {
+    return;
+  }
+
+  context.save();
+  context.globalAlpha = pressurePulseStrength * 0.34;
+  const gradient = context.createLinearGradient(0, 0, 0, CANVAS_HEIGHT);
+  gradient.addColorStop(0, "rgba(255, 209, 102, 0.34)");
+  gradient.addColorStop(0.4, "rgba(255, 107, 154, 0.14)");
+  gradient.addColorStop(1, "rgba(255, 107, 154, 0)");
+  context.fillStyle = gradient;
+  context.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
   context.restore();
 }
 

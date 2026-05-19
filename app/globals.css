@@ -127,11 +127,16 @@ button {
 
 .title-row {
   min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .game-title {
   min-width: 0;
   margin: 0;
+  flex: 1 1 auto;
   display: flex;
   align-items: baseline;
   gap: 4px;
@@ -163,6 +168,55 @@ button {
   text-shadow:
     0 2px 0 rgba(84, 41, 2, 0.22),
     0 9px 20px rgba(255, 209, 102, 0.28);
+}
+
+.stage-badge {
+  flex: 0 0 auto;
+  min-width: 77px;
+  max-width: 94px;
+  padding: 7px 8px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 209, 102, 0.18), transparent 65%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)),
+    rgba(12, 16, 49, 0.62);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 9px 22px rgba(0, 0, 0, 0.14);
+}
+
+.stage-badge span,
+.stage-badge small {
+  display: block;
+  color: var(--muted);
+  font-size: 0.5rem;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.stage-badge strong {
+  display: block;
+  margin-top: 3px;
+  color: #fff7c8;
+  font-size: 0.72rem;
+  font-weight: 950;
+  line-height: 0.95;
+  letter-spacing: -0.02em;
+  text-shadow: 0 0 14px rgba(255, 209, 102, 0.3);
+}
+
+.stage-badge small {
+  margin-top: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  color: rgba(174, 246, 255, 0.82);
+  font-size: 0.44rem;
+  letter-spacing: 0.04em;
+  text-overflow: ellipsis;
 }
 
 .next-bubble {
@@ -292,6 +346,56 @@ button {
     inset 0 0 34px rgba(84, 226, 255, 0.08),
     0 18px 42px rgba(0, 0, 0, 0.3);
   touch-action: none;
+}
+
+.stage-toast {
+  position: absolute;
+  z-index: 2;
+  top: 138px;
+  left: 50%;
+  min-width: 190px;
+  max-width: calc(100% - 46px);
+  padding: 11px 15px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  color: #ffffff;
+  pointer-events: none;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.18), transparent 68%),
+    linear-gradient(135deg, rgba(84, 226, 255, 0.88), rgba(167, 139, 250, 0.8) 56%, rgba(255, 209, 102, 0.82));
+  box-shadow:
+    0 14px 38px rgba(0, 0, 0, 0.28),
+    0 0 28px rgba(84, 226, 255, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.32);
+  animation: stageToast 1600ms ease-out forwards;
+}
+
+.stage-toast--pressure {
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.18), transparent 68%),
+    linear-gradient(135deg, rgba(255, 209, 102, 0.9), rgba(255, 107, 154, 0.82));
+  animation-duration: 1250ms;
+}
+
+.stage-toast strong {
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 0 rgba(4, 8, 31, 0.18);
+}
+
+.stage-toast span {
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 0.67rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .game-canvas {
@@ -526,6 +630,28 @@ button {
   100% {
     opacity: 0;
     transform: translateY(-24px) scale(1);
+  }
+}
+
+@keyframes stageToast {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px) scale(0.92);
+  }
+
+  16% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1.04);
+  }
+
+  76% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-8px) scale(0.98);
   }
 }
 

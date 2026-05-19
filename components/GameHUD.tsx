@@ -1,10 +1,12 @@
 import { COLOR_BY_ID } from "@/lib/game/constants";
+import { getTierHudDetail, type DifficultyTier } from "@/lib/game/difficulty";
 
 type GameHUDProps = {
   score: number;
   bestScore: number;
   nextColorId: string;
   scoreFeedback: ScoreFeedback | null;
+  difficultyTier: DifficultyTier;
 };
 
 export type ScoreFeedback = {
@@ -13,7 +15,7 @@ export type ScoreFeedback = {
   droppedCount: number;
 };
 
-export function GameHUD({ score, bestScore, nextColorId, scoreFeedback }: GameHUDProps) {
+export function GameHUD({ score, bestScore, nextColorId, scoreFeedback, difficultyTier }: GameHUDProps) {
   const nextColor = COLOR_BY_ID[nextColorId];
 
   return (
@@ -23,6 +25,11 @@ export function GameHUD({ score, bestScore, nextColorId, scoreFeedback }: GameHU
           <span className="game-title__bubble">Bubble</span>
           <span className="game-title__dragon">Dragon</span>
         </h1>
+        <div className="stage-badge" aria-label={`Stage ${difficultyTier.stage}, ${difficultyTier.name}`}>
+          <span>Stage {difficultyTier.stage}</span>
+          <strong>{difficultyTier.name}</strong>
+          <small>{getTierHudDetail(difficultyTier)}</small>
+        </div>
       </div>
       <div className="stats-row">
         <div className="stat-card score-card">
