@@ -31,6 +31,23 @@ export function GameHUD({ score, bestScore, nextColorId, scoreFeedback, difficul
           <small>{getTierHudDetail(difficultyTier)}</small>
         </div>
       </div>
+      <div className="hero-gif-row" aria-label="Bubble Dragon mascot animation">
+        <img
+          className="hero-gif-row__dragon"
+          src="/images/gifs/dragon-shoot.gif"
+          alt="Bubble Dragon mascot"
+          width={148}
+          height={148}
+        />
+        <img
+          className="hero-gif-row__pop"
+          src="/images/gifs/bubble-pop-transparent.gif"
+          alt=""
+          width={58}
+          height={58}
+          aria-hidden="true"
+        />
+      </div>
       <div className="stats-row">
         <div className="stat-card score-card">
           <span className="stat-card__label">Score</span>

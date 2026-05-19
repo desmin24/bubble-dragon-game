@@ -219,6 +219,50 @@ button {
   text-overflow: ellipsis;
 }
 
+.hero-gif-row {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 108px;
+  margin: -1px 0 1px;
+  pointer-events: none;
+}
+
+.hero-gif-row::before {
+  content: "";
+  position: absolute;
+  width: 136px;
+  height: 76px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 44%, rgba(84, 226, 255, 0.28), transparent 68%),
+    radial-gradient(circle at 50% 60%, rgba(255, 209, 102, 0.16), transparent 62%);
+  filter: blur(4px);
+}
+
+.hero-gif-row__dragon {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: clamp(120px, 36vw, 152px);
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 22px rgba(3, 9, 30, 0.38)) drop-shadow(0 0 20px rgba(84, 226, 255, 0.2));
+}
+
+.hero-gif-row__pop {
+  position: absolute;
+  z-index: 2;
+  right: max(58px, 19%);
+  top: 7px;
+  display: block;
+  width: clamp(42px, 13vw, 58px);
+  height: auto;
+  object-fit: contain;
+  opacity: 0.92;
+  filter: drop-shadow(0 7px 14px rgba(84, 226, 255, 0.22));
+}
+
 .next-bubble {
   display: grid;
   place-items: center;
