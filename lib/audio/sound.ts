@@ -120,7 +120,7 @@ export class BubbleDragonSound {
 
     masterGain.gain.value = 0.82;
     sfxGain.gain.value = 0.78;
-    musicGain.gain.value = 0.055;
+    musicGain.gain.value = 0.09;
 
     sfxGain.connect(masterGain);
     musicGain.connect(masterGain);
@@ -226,6 +226,57 @@ export class BubbleDragonSound {
     source.start(startTime);
   }
 
+  private playMusicPluck(startTime: number, frequency: number, duration: number, volume: number) {
+    const context = this.context;
+    const output = this.musicGain;
+
+    if (!context || !output) {
+      return;
+    }
+
+    const oscillator = context.createOscillator();
+    const filter = context.createBiquadFilter();
+    const gain = context.createGain();
+
+    oscillator.type = "square";
+    oscillator.frequency.setValueAtTime(frequency, startTime);
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(1850, startTime);
+    filter.Q.value = 0.7;
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    oscillator.connect(filter);
+    filter.connect(gain);
+    gain.connect(output);
+    oscillator.start(startTime);
+    oscillator.stop(startTime + duration + 0.03);
+  }
+
+  private playMusicBell(startTime: number, frequency: number, duration: number, volume: number) {
+    const context = this.context;
+    const output = this.musicGain;
+
+    if (!context || !output) {
+      return;
+    }
+
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+
+    oscillator.type = "triangle";
+    oscillator.frequency.setValueAtTime(frequency, startTime);
+    gain.gain.setValueAtTime(0.0001, startTime);
+    gain.gain.exponentialRampToValueAtTime(volume, startTime + 0.018);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+
+    oscillator.connect(gain);
+    gain.connect(output);
+    oscillator.start(startTime);
+    oscillator.stop(startTime + duration + 0.03);
+  }
+
   private startMusic() {
     const context = this.context;
     const output = this.musicGain;
@@ -235,46 +286,81 @@ export class BubbleDragonSound {
     }
 
     const bass = context.createOscillator();
-    const shimmer = context.createOscillator();
     const bassGain = context.createGain();
-    const shimmerGain = context.createGain();
 
-    bass.type = "sine";
-    shimmer.type = "triangle";
-    bassGain.gain.value = 0.42;
-    shimmerGain.gain.value = 0.18;
+    bass.type = "triangle";
+    bassGain.gain.value = 0.0001;
 
     bass.connect(bassGain);
-    shimmer.connect(shimmerGain);
     bassGain.connect(output);
-    shimmerGain.connect(output);
 
     bass.start();
-    shimmer.start();
-    this.musicOscillators = [bass, shimmer];
+    this.musicOscillators = [bass];
 
-    const notes = [
-      { bass: 110, shimmer: 440 },
-      { bass: 146.83, shimmer: 493.88 },
-      { bass: 130.81, shimmer: 523.25 },
-      { bass: 164.81, shimmer: 659.25 },
+    const pattern: Array<{ bass: number; melody?: number; bell?: number; accent?: boolean; bassHit?: boolean }> = [
+      { bass: 130.81, melody: 659.25, bell: 1318.51, accent: true, bassHit: true },
+      { bass: 130.81 },
+      { bass: 196, melody: 783.99, bassHit: true },
+      { bass: 196, melody: 880 },
+      { bass: 146.83 },
+      { bass: 146.83, melody: 783.99, bassHit: true },
+      { bass: 220, melody: 659.25 },
+      { bass: 220 },
+      { bass: 164.81, melody: 880, accent: true, bassHit: true },
+      { bass: 164.81 },
+      { bass: 246.94, melody: 987.77, bell: 1567.98 },
+      { bass: 246.94 },
+      { bass: 196, melody: 783.99, bassHit: true },
+      { bass: 196 },
+      { bass: 220, melody: 659.25 },
+      { bass: 246.94 },
+      { bass: 261.63, melody: 1046.5, accent: true, bassHit: true },
+      { bass: 261.63 },
+      { bass: 196, melody: 987.77 },
+      { bass: 196, melody: 880, bassHit: true },
+      { bass: 220 },
+      { bass: 220, melody: 783.99 },
+      { bass: 246.94, melody: 880, bell: 1760 },
+      { bass: 246.94 },
+      { bass: 196, melody: 987.77, accent: true, bassHit: true },
+      { bass: 196 },
+      { bass: 164.81, melody: 783.99 },
+      { bass: 164.81 },
+      { bass: 146.83, melody: 659.25, bassHit: true },
+      { bass: 146.83 },
+      { bass: 220, melody: 739.99 },
+      { bass: 246.94 },
     ];
-    let noteIndex = 0;
+    let stepIndex = 0;
 
     const updateMusic = () => {
-      if (!this.context || this.musicOscillators.length < 2) {
+      if (!this.context || this.musicOscillators.length < 1) {
         return;
       }
 
-      const note = notes[noteIndex % notes.length];
+      const note = pattern[stepIndex % pattern.length];
       const now = this.context.currentTime;
-      this.musicOscillators[0].frequency.exponentialRampToValueAtTime(note.bass, now + 0.18);
-      this.musicOscillators[1].frequency.exponentialRampToValueAtTime(note.shimmer, now + 0.22);
-      noteIndex += 1;
+      const isDownbeat = note.accent === true;
+      const shouldPulseBass = note.bassHit === true;
+
+      this.musicOscillators[0].frequency.setTargetAtTime(note.bass, now, 0.018);
+      bassGain.gain.cancelScheduledValues(now);
+      bassGain.gain.setValueAtTime(isDownbeat ? 0.18 : shouldPulseBass ? 0.08 : 0.0001, now);
+      bassGain.gain.exponentialRampToValueAtTime(0.026, now + 0.2);
+
+      if (note.melody) {
+        this.playMusicPluck(now, note.melody, isDownbeat ? 0.19 : 0.15, isDownbeat ? 0.28 : 0.2);
+      }
+
+      if (note.bell) {
+        this.playMusicBell(now + 0.045, note.bell, 0.17, 0.085);
+      }
+
+      stepIndex += 1;
     };
 
     updateMusic();
-    this.musicTimer = window.setInterval(updateMusic, 1900);
+    this.musicTimer = window.setInterval(updateMusic, 245);
   }
 
   private stopMusic() {
