@@ -59,23 +59,23 @@ button {
   width: 100%;
   max-width: 100dvw;
   min-height: 100svh;
-  overflow: hidden;
+  overflow-x: hidden;
   display: grid;
-  align-items: center;
-  justify-items: start;
-  padding: 10px 8px;
+  align-items: start;
+  justify-items: center;
+  padding: 10px 7px 18px;
 }
 
 .game-frame {
-  width: min(374px, calc(100vw - 16px));
-  max-width: 374px;
+  width: min(378px, calc(100vw - 14px));
+  max-width: 378px;
   min-width: 0;
-  height: min(100svh - 20px, 860px);
+  height: auto;
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 11px;
-  padding: 13px;
+  gap: 10px;
+  padding: 12px;
   border: 1px solid rgba(222, 238, 255, 0.2);
   border-radius: 32px;
   background:
@@ -122,7 +122,7 @@ button {
 
 .game-hud {
   display: grid;
-  gap: 9px;
+  gap: 8px;
 }
 
 .title-row {
@@ -140,9 +140,9 @@ button {
   display: flex;
   align-items: baseline;
   gap: 4px;
-  font-size: clamp(2rem, 8.9vw, 3.15rem);
-  line-height: 0.82;
-  letter-spacing: -0.085em;
+  font-size: clamp(1.82rem, 8vw, 2.82rem);
+  line-height: 0.84;
+  letter-spacing: -0.08em;
   filter: drop-shadow(0 8px 16px rgba(7, 13, 44, 0.5));
 }
 
@@ -174,9 +174,9 @@ button {
   flex: 0 0 auto;
   min-width: 77px;
   max-width: 94px;
-  padding: 7px 8px 8px;
+  padding: 6px 7px 7px;
   border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 18px;
+  border-radius: 16px;
   background:
     radial-gradient(circle at 50% 0%, rgba(255, 209, 102, 0.18), transparent 65%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.03)),
@@ -200,9 +200,9 @@ button {
 
 .stage-badge strong {
   display: block;
-  margin-top: 3px;
+  margin-top: 2px;
   color: #fff7c8;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 950;
   line-height: 0.95;
   letter-spacing: -0.02em;
@@ -210,7 +210,7 @@ button {
 }
 
 .stage-badge small {
-  margin-top: 4px;
+  margin-top: 3px;
   max-width: 100%;
   overflow: hidden;
   color: rgba(174, 246, 255, 0.82);
@@ -223,16 +223,16 @@ button {
   position: relative;
   display: grid;
   place-items: center;
-  min-height: 108px;
-  margin: -1px 0 1px;
+  min-height: 88px;
+  margin: -3px 0 -1px;
   pointer-events: none;
 }
 
 .hero-gif-row::before {
   content: "";
   position: absolute;
-  width: 136px;
-  height: 76px;
+  width: 120px;
+  height: 66px;
   border-radius: 999px;
   background:
     radial-gradient(circle at 50% 44%, rgba(84, 226, 255, 0.28), transparent 68%),
@@ -244,7 +244,7 @@ button {
   position: relative;
   z-index: 1;
   display: block;
-  width: clamp(120px, 36vw, 152px);
+  width: clamp(104px, 31vw, 132px);
   height: auto;
   object-fit: contain;
   filter: drop-shadow(0 12px 22px rgba(3, 9, 30, 0.38)) drop-shadow(0 0 20px rgba(84, 226, 255, 0.2));
@@ -253,10 +253,10 @@ button {
 .hero-gif-row__pop {
   position: absolute;
   z-index: 2;
-  right: max(58px, 19%);
-  top: 7px;
+  right: max(54px, 20%);
+  top: 5px;
   display: block;
-  width: clamp(42px, 13vw, 58px);
+  width: clamp(36px, 11vw, 50px);
   height: auto;
   object-fit: contain;
   opacity: 0.92;
@@ -267,8 +267,8 @@ button {
   display: grid;
   place-items: center;
   min-width: 0;
-  padding: 9px 8px 8px;
-  border-radius: 20px;
+  padding: 8px 7px 7px;
+  border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   background:
     radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.2), transparent 60%),
@@ -290,9 +290,9 @@ button {
 }
 
 .next-bubble__orb {
-  width: 29px;
-  height: 29px;
-  margin-top: 5px;
+  width: 27px;
+  height: 27px;
+  margin-top: 4px;
   border-radius: 999px;
   background:
     radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.95) 0 10%, rgba(255, 255, 255, 0.32) 11% 20%, transparent 22%),
@@ -306,16 +306,16 @@ button {
 
 .stats-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 88px;
-  gap: 8px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 84px;
+  gap: 7px;
 }
 
 .stat-card {
   position: relative;
   min-width: 0;
-  padding: 10px 11px 11px;
+  padding: 8px 10px 9px;
   border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 20px;
+  border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
     var(--panel);
@@ -329,7 +329,7 @@ button {
   display: block;
   margin-top: 2px;
   color: #ffffff;
-  font-size: 1.5rem;
+  font-size: 1.36rem;
   font-weight: 900;
   letter-spacing: -0.04em;
   text-shadow: 0 0 14px rgba(84, 226, 255, 0.26);
@@ -375,10 +375,11 @@ button {
 }
 
 .canvas-wrap {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   min-height: 0;
   overflow: hidden;
   width: 100%;
+  aspect-ratio: 360 / 610;
   border: 1px solid rgba(196, 226, 255, 0.2);
   border-radius: 25px;
   background:
@@ -453,7 +454,7 @@ button {
 
 .game-footer {
   display: grid;
-  gap: 7px;
+  gap: 6px;
   justify-items: center;
 }
 
@@ -469,7 +470,7 @@ button {
   width: 100%;
   border: 0;
   border-radius: 999px;
-  padding: 13px 20px 14px;
+  padding: 12px 20px 13px;
   color: #1a1233;
   font-size: 1.05rem;
   font-weight: 950;
@@ -490,7 +491,7 @@ button {
 
 .sound-toggle {
   min-width: 0;
-  height: 45px;
+  height: 43px;
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 999px;
   display: inline-flex;
@@ -562,7 +563,7 @@ button {
 .hint-text {
   margin: 0;
   color: rgba(232, 238, 255, 0.82);
-  font-size: 0.9rem;
+  font-size: 0.84rem;
   font-weight: 750;
   letter-spacing: 0.03em;
   text-shadow: 0 0 12px rgba(84, 226, 255, 0.24);
@@ -696,6 +697,100 @@ button {
   100% {
     opacity: 0;
     transform: translateX(-50%) translateY(-8px) scale(0.98);
+  }
+}
+
+@media (max-width: 719px) {
+  .game-frame {
+    gap: 8px;
+    padding: 10px;
+  }
+
+  .game-hud {
+    gap: 6px;
+  }
+
+  .title-row {
+    gap: 6px;
+  }
+
+  .game-title {
+    font-size: clamp(1.68rem, 7.35vw, 2.34rem);
+    line-height: 0.86;
+  }
+
+  .stage-badge {
+    min-width: 70px;
+    max-width: 84px;
+    padding: 5px 6px 6px;
+  }
+
+  .stage-badge span,
+  .stage-badge small {
+    font-size: 0.46rem;
+  }
+
+  .stage-badge strong {
+    margin-top: 2px;
+    font-size: 0.62rem;
+  }
+
+  .stage-badge small {
+    margin-top: 2px;
+    font-size: 0.4rem;
+  }
+
+  .hero-gif-row {
+    min-height: 68px;
+    margin: -7px 0 -6px;
+  }
+
+  .hero-gif-row::before {
+    width: 92px;
+    height: 48px;
+    filter: blur(3px);
+  }
+
+  .hero-gif-row__dragon {
+    width: 96px;
+  }
+
+  .hero-gif-row__pop {
+    right: max(72px, 26%);
+    top: 8px;
+    width: 32px;
+  }
+
+  .stats-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 78px;
+    gap: 6px;
+  }
+
+  .stat-card,
+  .next-bubble {
+    padding: 7px 8px 8px;
+    border-radius: 16px;
+  }
+
+  .next-bubble__label,
+  .stat-card__label {
+    font-size: 0.5rem;
+    letter-spacing: 0.055em;
+  }
+
+  .stat-card__value {
+    margin-top: 1px;
+    font-size: 1.22rem;
+  }
+
+  .next-bubble__orb {
+    width: 24px;
+    height: 24px;
+    margin-top: 3px;
+  }
+
+  .canvas-wrap {
+    min-height: 330px;
   }
 }
 
