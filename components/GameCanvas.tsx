@@ -18,6 +18,7 @@ import {
 import { addBubbleToGrid, createInitialGrid } from "@/lib/game/grid";
 import { buildAimPath, createShot, getAimTarget, hasHitBubble, updateMovingBubble } from "@/lib/game/physics";
 import { resolveSettledShot } from "@/lib/game/rules";
+import { BubbleDragonSound, STORAGE_SOUND_ENABLED_KEY, type SoundCue } from "@/lib/audio/sound";
 import type { AimState, GridBubble, MovingBubble } from "@/lib/game/types";
 
 type GameState = {
@@ -81,6 +82,7 @@ export function GameCanvas() {
   const stateRef = useRef<GameState>(createNewGame());
   const bubbleEffectsRef = useRef<BubbleEffect[]>([]);
   const hitEffectsRef = useRef<HitEffect[]>([]);
+  const soundRef = useRef<BubbleDragonSound | null>(null);
   const animationRef = useRef<number | null>(null);
   const lastFrameRef = useRef<number>(0);
   const scoreFeedbackIdRef = useRef(0);
@@ -89,6 +91,15 @@ export function GameCanvas() {
   const [nextColorId, setNextColorId] = useState(stateRef.current.nextColorId);
   const [gameOver, setGameOver] = useState(false);
   const [scoreFeedback, setScoreFeedback] = useState<ScoreFeedback | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const playSound = useCallback((cue: SoundCue) => {
+    soundRef.current?.play(cue);
+  }, []);
+
+  const unlockAudio = useCallback(() => {
+    void soundRef.current?.unlock();
+  }, []);
 
   const syncReactState = useCallback(() => {
     const state = stateRef.current;
@@ -107,19 +118,32 @@ export function GameCanvas() {
   }, []);
 
   const restart = useCallback(() => {
+    unlockAudio();
     stateRef.current = createNewGame();
     bubbleEffectsRef.current = [];
     hitEffectsRef.current = [];
     setScoreFeedback(null);
     syncReactState();
-  }, [syncReactState]);
+  }, [syncReactState, unlockAudio]);
 
   useEffect(() => {
+    const sound = new BubbleDragonSound();
+    const storedSoundEnabled = localStorage.getItem(STORAGE_SOUND_ENABLED_KEY);
+    const initialSoundEnabled = storedSoundEnabled !== "false";
     const storedBest = Number(localStorage.getItem(STORAGE_BEST_SCORE_KEY) ?? "0");
+
+    sound.setEnabled(initialSoundEnabled);
+    soundRef.current = sound;
+    setSoundEnabled(initialSoundEnabled);
 
     if (Number.isFinite(storedBest)) {
       setBestScore(storedBest);
     }
+
+    return () => {
+      sound.dispose();
+      soundRef.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -164,8 +188,13 @@ export function GameCanvas() {
       return;
     }
 
+    const previousVelocityX = state.moving.vx;
     const moving = updateMovingBubble(state.moving, deltaSeconds);
     state.moving = moving;
+
+    if (Math.sign(previousVelocityX) !== Math.sign(moving.vx)) {
+      playSound("settle");
+    }
 
     if (moving.y <= GRID_TOP + BUBBLE_RADIUS || hasHitBubble(moving, state.grid)) {
       settleMovingBubble(moving);
@@ -178,6 +207,7 @@ export function GameCanvas() {
     const resolution = resolveSettledShot(state.grid, settled);
     const nextGrid = resolution.grid;
     const now = performance.now();
+    const didGameOver = nextGrid.some((bubble) => bubble.y + BUBBLE_RADIUS >= DANGER_LINE_Y);
 
     hitEffectsRef.current.push({
       id: `hit-${settled.id}-${now}`,
@@ -213,6 +243,20 @@ export function GameCanvas() {
       })),
     );
 
+    playSound("settle");
+
+    if (resolution.matched.length >= 3) {
+      playSound("clear");
+    }
+
+    if (resolution.dropped.length > 0) {
+      playSound("drop");
+    }
+
+    if (didGameOver) {
+      playSound("gameOver");
+    }
+
     state.score += resolution.scoreDelta;
 
     if (resolution.scoreDelta > 0) {
@@ -228,8 +272,25 @@ export function GameCanvas() {
     state.moving = null;
     state.currentColorId = state.nextColorId;
     state.nextColorId = randomColorId();
-    state.gameOver = nextGrid.some((bubble) => bubble.y + BUBBLE_RADIUS >= DANGER_LINE_Y);
+    state.gameOver = didGameOver;
     syncReactState();
+  };
+
+  const toggleSound = () => {
+    setSoundEnabled((currentSoundEnabled) => {
+      const nextSoundEnabled = !currentSoundEnabled;
+
+      localStorage.setItem(STORAGE_SOUND_ENABLED_KEY, String(nextSoundEnabled));
+      soundRef.current?.setEnabled(nextSoundEnabled);
+
+      if (nextSoundEnabled) {
+        void soundRef.current?.unlock().then(() => {
+          soundRef.current?.play("clear");
+        });
+      }
+
+      return nextSoundEnabled;
+    });
   };
 
   const getPointerPosition = (event: React.PointerEvent<HTMLCanvasElement>) => {
@@ -254,6 +315,7 @@ export function GameCanvas() {
       return;
     }
 
+    unlockAudio();
     event.currentTarget.setPointerCapture(event.pointerId);
     const pointer = getPointerPosition(event);
     const target = getAimTarget(pointer.x, pointer.y);
@@ -281,6 +343,8 @@ export function GameCanvas() {
 
     const pointer = getPointerPosition(event);
     const target = getAimTarget(pointer.x, pointer.y);
+    unlockAudio();
+    playSound("shoot");
     state.moving = createShot(target.x, target.y, state.currentColorId);
     state.aim = emptyAim;
   };
@@ -304,9 +368,21 @@ export function GameCanvas() {
         />
       </div>
       <footer className="game-footer">
-        <button className="restart-button" type="button" onClick={restart}>
-          Restart
-        </button>
+        <div className="footer-actions">
+          <button className="restart-button" type="button" onClick={restart}>
+            Restart
+          </button>
+          <button
+            className="sound-toggle"
+            type="button"
+            aria-pressed={!soundEnabled}
+            aria-label={soundEnabled ? "Mute sound" : "Turn sound on"}
+            onClick={toggleSound}
+          >
+            <span className="sound-toggle__dot" aria-hidden="true" />
+            <span>{soundEnabled ? "Sound" : "Mute"}</span>
+          </button>
+        </div>
         <p className="hint-text">拖曳瞄準，放開發射</p>
       </footer>
       {gameOver ? <GameOverlay score={score} onRestart={restart} /> : null}

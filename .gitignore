@@ -17,3 +17,6 @@ Thumbs.db
 
 # Local visual QA artifacts
 render-mobile*.png
+
+# Local dev server logs
+server-*.log
